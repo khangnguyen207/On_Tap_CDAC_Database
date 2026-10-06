@@ -81,6 +81,7 @@
                 <button type="button" class="btn-count flex-1 py-2 rounded-lg border border-slate-300 font-semibold text-sm hover:border-indigo-600 focus:outline-none" data-count="10" onclick="selectCount(10)">10 câu</button>
                 <button type="button" class="btn-count flex-1 py-2 rounded-lg border border-indigo-600 bg-indigo-50 text-indigo-700 font-semibold text-sm" data-count="20" onclick="selectCount(20)">20 câu</button>
                 <button type="button" class="btn-count flex-1 py-2 rounded-lg border border-slate-300 font-semibold text-sm hover:border-indigo-600 focus:outline-none" data-count="30" onclick="selectCount(30)">30 câu</button>
+                <button type="button" class="btn-count flex-1 py-2 rounded-lg border border-slate-300 font-semibold text-sm hover:border-indigo-600 focus:outline-none" data-count="260" onclick="selectCount(260)">260 câu</button>
               </div>
             </div>
 
@@ -149,6 +150,9 @@
             <button onclick="startMistakesReview()" id="btn-review-mistakes" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-sm disabled:opacity-50" disabled>
               <i class="fa-solid fa-arrow-rotate-left"></i> Ôn tập lại câu làm sai
             </button>
+            <button onclick="startFlashcards(true)" id="btn-review-cards" class="w-full bg-white hover:bg-red-50 text-red-600 border border-red-200 font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-sm disabled:opacity-50" disabled>
+              <i class="fa-solid fa-layer-group"></i> Ôn tập thẻ chưa thuộc
+            </button>
             <button onclick="clearStorageData()" class="w-full text-slate-400 hover:text-slate-600 text-xs py-1 transition text-center">
               Đặt lại toàn bộ tiến độ
             </button>
@@ -197,6 +201,9 @@
           <!-- Dynamically populated options -->
         </div>
 
+        <!-- Hint Area (Practice mode only) -->
+        <div id="hint-box" class="hidden p-4 rounded-xl text-sm border border-sky-300 bg-sky-50 text-sky-900 space-y-1.5"></div>
+
         <!-- Feedback & Rationale Area (Visible immediately in Practice mode, or after submit) -->
         <div id="feedback-container" class="hidden p-4 rounded-xl text-sm border space-y-2">
           <div id="feedback-status" class="font-bold flex items-center gap-2"></div>
@@ -205,10 +212,15 @@
       </div>
 
       <!-- Quiz Navigation Footer -->
-      <div class="flex justify-between items-center pt-2">
-        <button id="btn-prev-q" onclick="goToPrevQuestion()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg text-sm transition">
-          <i class="fa-solid fa-chevron-left"></i> Câu trước
-        </button>
+      <div class="flex justify-between items-center pt-2 gap-2">
+        <div class="flex items-center gap-2">
+          <button id="btn-prev-q" onclick="goToPrevQuestion()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg text-sm transition">
+            <i class="fa-solid fa-chevron-left"></i> Câu trước
+          </button>
+          <button id="btn-hint-q" onclick="showHint()" class="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-sm transition flex items-center gap-1.5">
+            <i class="fa-solid fa-lightbulb"></i> Gợi ý
+          </button>
+        </div>
         <button id="btn-check-q" onclick="checkCurrentAnswer()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm shadow transition">
           Kiểm tra đáp án
         </button>
@@ -262,8 +274,20 @@
         </span>
       </div>
 
+      <!-- Flashcard session status -->
+      <div class="flex flex-wrap justify-between items-center gap-2 text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+        <span class="text-slate-600 font-medium">
+          Đã thuộc: <strong id="fc-done-count" class="text-emerald-600">0</strong> ·
+          Chưa thuộc: <strong id="fc-todo-count" class="text-red-600">0</strong> ·
+          Còn lại: <strong id="fc-left-count" class="text-indigo-600">0</strong>
+        </span>
+        <button id="btn-fc-review" onclick="startFlashcards(true)" class="text-red-600 hover:text-red-800 font-bold flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+          <i class="fa-solid fa-arrow-rotate-left"></i> Ôn lại thẻ chưa thuộc
+        </button>
+      </div>
+
       <!-- Flashcard Interactive Area -->
-      <div onclick="flipCard()" class="perspective w-full h-80 cursor-pointer">
+      <div id="fc-card" onclick="flipCard()" class="perspective w-full h-80 cursor-pointer">
         <div id="flashcard-inner" class="relative w-full h-full transition-transform duration-500 transform-style-3d shadow-md rounded-2xl">
           <!-- Front -->
           <div class="absolute w-full h-full bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between backface-hidden">
@@ -297,16 +321,41 @@
       </div>
 
       <!-- Card navigation buttons -->
-      <div class="flex justify-between items-center gap-3">
-        <button onclick="prevFlashcard()" class="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-sm transition">
-          <i class="fa-solid fa-arrow-left"></i> Thẻ trước
+      <div id="fc-nav" class="flex justify-between items-center gap-3">
+        <button onclick="prevFlashcard()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-sm transition shrink-0">
+          <i class="fa-solid fa-arrow-left"></i> Trước
         </button>
-        <button onclick="markCardMastered()" class="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-xl text-xs transition">
-          <i class="fa-solid fa-check"></i> Đã thuộc
+        <div class="flex items-center gap-2">
+          <button onclick="markCardUnmastered()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-xl text-xs transition flex items-center gap-1.5">
+            <i class="fa-solid fa-xmark"></i> Chưa thuộc
+          </button>
+          <button onclick="markCardMastered()" class="px-4 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-xl text-xs transition flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Đã thuộc
+          </button>
+        </div>
+        <button onclick="nextFlashcard()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition shadow shrink-0">
+          Kế tiếp <i class="fa-solid fa-arrow-right"></i>
         </button>
-        <button onclick="nextFlashcard()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition shadow">
-          Thẻ kế tiếp <i class="fa-solid fa-arrow-right"></i>
-        </button>
+      </div>
+
+      <!-- Flashcard session finished -->
+      <div id="fc-done" class="hidden bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center space-y-4">
+        <div class="w-16 h-16 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl">
+          <i class="fa-solid fa-flag-checkered"></i>
+        </div>
+        <h3 class="text-lg font-black text-slate-800">Hoàn thành phiên ôn tập thẻ!</h3>
+        <p class="text-sm text-slate-600">
+          Bạn đã đánh dấu <strong class="text-emerald-600" id="fc-done-total">0</strong> thẻ đã thuộc và
+          <strong class="text-red-600" id="fc-todo-total">0</strong> thẻ chưa thuộc trong phiên này.
+        </p>
+        <div class="flex flex-wrap justify-center gap-3">
+          <button onclick="startFlashcards(false)" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition shadow">
+            <i class="fa-solid fa-rotate-right"></i> Ôn lại toàn bộ thẻ
+          </button>
+          <button onclick="showView('home')" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-sm transition shadow">
+            Về trang chủ
+          </button>
+        </div>
       </div>
     </div>
   </main>
@@ -324,7 +373,7 @@
         difficulty: "easy",
         question: "Which of the following is not an advantage of the DBMS?",
         options: [
-          { text: "User application data creation.", isCorrect: true, rationale: "User application data creation is an external process performed by the user or application logic, not an inherent advantage of a DBMS engine." },
+          { text: "User application data creation.", isCorrect: true, rationale: "Việc tạo dữ liệu cho ứng dụng là quá trình bên ngoài, do người dùng hoặc logic ứng dụng thực hiện, không phải là lợi ích nội tại của hệ quản trị CSDL." },
           { text: "Data independence and efficient access.", isCorrect: false },
           { text: "Reduced application development time.", isCorrect: false },
           { text: "Data integrity and security.", isCorrect: false }
@@ -337,10 +386,10 @@
         difficulty: "medium",
         question: "Which Background process updates the online redo log files with the redo log buffer entries when a COMMIT occurs in the database?",
         options: [
-          { text: "LGWR", isCorrect: true, rationale: "Log Writer (LGWR) writes redo log entries from the SGA Redo Log Buffer to the online redo log files on disk at commit time." },
-          { text: "DBWn", isCorrect: false, rationale: "DBWn writes modified database blocks from the buffer cache to data files on disk." },
-          { text: "CKPT", isCorrect: false, rationale: "CKPT signals DBWn at checkpoints and updates data file headers and control files." },
-          { text: "CJQn", isCorrect: false, rationale: "CJQn is the coordinator job queue background process." }
+          { text: "LGWR", isCorrect: true, rationale: "Log Writer (LGWR) ghi các mục redo từ Redo Log Buffer trong SGA xuống file redo log trên đĩa tại thời điểm COMMIT." },
+          { text: "DBWn", isCorrect: false, rationale: "DBWn ghi các block dữ liệu đã bị sửa đổi từ Buffer Cache xuống file dữ liệu trên đĩa." },
+          { text: "CKPT", isCorrect: false, rationale: "CKPT phát tín hiệu cho DBWn tại các điểm checkpoint và cập nhật header file dữ liệu cùng file control." },
+          { text: "CJQn", isCorrect: false, rationale: "CJQn là tiến trình điều phối hàng đợi công việc (job queue)." }
         ]
       },
       {
@@ -350,7 +399,7 @@
         difficulty: "easy",
         question: "Which files can be multiplexed to safeguard against media failure in Oracle Database?",
         options: [
-          { text: "Control Files and Redo Log Files (Data Files are not multiplexed via Oracle standard multiplexing mechanism)", isCorrect: true, rationale: "Control files and redo log files can be multiplexed by Oracle directly; ordinary data files cannot be multiplexed in this specific manner." },
+          { text: "Control Files and Redo Log Files (Data Files are not multiplexed via Oracle standard multiplexing mechanism)", isCorrect: true, rationale: "Control file và redo log file có thể được Oracle nhân bản (multiplex) trực tiếp; file dữ liệu thông thường không được nhân bản theo cơ chế chuẩn này." },
           { text: "Parameter Files", isCorrect: false },
           { text: "Data Buffer Cache", isCorrect: false },
           { text: "Password Files", isCorrect: false }
@@ -363,7 +412,7 @@
         difficulty: "easy",
         question: "Which Statement about the Data files is not true?",
         options: [
-          { text: "Maintain the logs of the changes made to the database to enable recovery.", isCorrect: true, rationale: "Redo Log Files (not Data Files) maintain records of changes for recovery." },
+          { text: "Maintain the logs of the changes made to the database to enable recovery.", isCorrect: true, rationale: "Redo Log Files (không phải Data Files) lưu các bản ghi về thay đổi dùng cho phục hồi." },
           { text: "A data file Can belong to only one tablespace", isCorrect: false },
           { text: "At least one data file is required for each tablespace", isCorrect: false },
           { text: "Data File contains the data in the database, including tables, indexes, temp segments etc", isCorrect: false }
@@ -376,7 +425,7 @@
         difficulty: "medium",
         question: "Which Statement about the Oracle Initialization Parameter Files (init.ora) is not true?",
         options: [
-          { text: "Parameters must be specified in a predefined order.", isCorrect: true, rationale: "Initialization parameters do not need to follow any predefined sequence." },
+          { text: "Parameters must be specified in a predefined order.", isCorrect: true, rationale: "Các tham số khởi tạo không cần phải theo một trình tự xác định sẵn nào." },
           { text: "Enclose in quotation marks any parameter value that contains a special character", isCorrect: false },
           { text: "An initialization parameter file should contain only parameters and comments.", isCorrect: false },
           { text: "Several parameters can be specified on one line, separated by a space", isCorrect: false }
@@ -389,7 +438,7 @@
         difficulty: "easy",
         question: "What is not true about the Oracle Instance?",
         options: [
-          { text: "Oracle Instance is a collection of data that is treated as a unit, which stores and retrieves related information", isCorrect: true, rationale: "This statement describes the Database (physical storage), whereas an Instance is the combination of memory (SGA) and background processes." },
+          { text: "Oracle Instance is a collection of data that is treated as a unit, which stores and retrieves related information", isCorrect: true, rationale: "Câu lệnh này mô tả về Database (lưu trữ vật lý), trong khi Instance là tổ hợp của bộ nhớ (SGA) và các tiến trình nền." },
           { text: "Oracle Instance provides means to access Oracle database", isCorrect: false },
           { text: "Oracle Instance can open and use one database at a time", isCorrect: false },
           { text: "Oracle Instance consists of SGA and background processes", isCorrect: false }
@@ -402,7 +451,7 @@
         difficulty: "easy",
         question: "Which of the following is not a part of System Global Area (SGA)?",
         options: [
-          { text: "Parameter Files", isCorrect: true, rationale: "Parameter files (pfile/spfile) reside on disk, while SGA is purely in memory." },
+          { text: "Parameter Files", isCorrect: true, rationale: "File tham số (pfile/spfile) nằm trên đĩa, còn SGA hoàn toàn nằm trong bộ nhớ." },
           { text: "Redo log Buffer", isCorrect: false },
           { text: "Data Buffer Cache", isCorrect: false },
           { text: "Shared Pool", isCorrect: false }
@@ -415,7 +464,7 @@
         difficulty: "medium",
         question: "Which of the following statements about the Data buffer cache is not true?",
         options: [
-          { text: "Data buffer cache stores a collection of the most recently used SQL statements.", isCorrect: true, rationale: "Recently parsed SQL statements and execution plans reside in the Library Cache inside the Shared Pool, not in the Data Buffer Cache." },
+          { text: "Data buffer cache stores a collection of the most recently used SQL statements.", isCorrect: true, rationale: "Các câu SQL vừa được phân tích và kế hoạch thực thi nằm trong Library Cache thuộc Shared Pool, không nằm trong Data Buffer Cache." },
           { text: "Data buffer cache stores the most recently used data", isCorrect: false },
           { text: "Data buffer cache read and write data to and from the data files", isCorrect: false },
           { text: "Size of each buffer in the Data buffer cache is equal to the size of an Oracle Block.", isCorrect: false }
@@ -428,7 +477,7 @@
         difficulty: "medium",
         question: "Which of the following statements about the Redo log buffer is not true?",
         options: [
-          { text: "The client process records changes in the redo log buffer", isCorrect: true, rationale: "Oracle Server Processes (not user/client processes) write redo entries directly into the SGA Redo Log Buffer." },
+          { text: "The client process records changes in the redo log buffer", isCorrect: true, rationale: "Tiến trình Server của Oracle (không phải tiến trình người dùng/client) ghi trực tiếp các mục redo vào Redo Log Buffer trong SGA." },
           { text: "The Redo log buffer records changes made to a database", isCorrect: false },
           { text: "The server process records changes in the redo log buffer", isCorrect: false },
           { text: "The Redo log buffer records the block that is changed, the location of the change and the new Value.", isCorrect: false }
@@ -441,7 +490,7 @@
         difficulty: "medium",
         question: "Which of the following is not stored by the Library Cache?",
         options: [
-          { text: "Results of the SQL statements", isCorrect: true, rationale: "Query results are returned to the client/session work area; the Library Cache holds parsed representations, trees, and execution plans." },
+          { text: "Results of the SQL statements", isCorrect: true, rationale: "Kết quả truy vấn được trả về vùng làm việc của client/session; Library Cache chỉ giữ dạng đã phân tích, cây cú pháp và kế hoạch thực thi." },
           { text: "The text of SQL statement", isCorrect: false },
           { text: "The Parse Tree: compiled version of a statement.", isCorrect: false },
           { text: "The Execution Plan", isCorrect: false }
@@ -506,7 +555,7 @@
         difficulty: "easy",
         question: "Which of the following is not among the ACID properties of a Transaction?",
         options: [
-          { text: "Independence", isCorrect: true, rationale: "ACID stands for Atomicity, Consistency, Isolation, and Durability ('I' is Isolation, not Independence)." },
+          { text: "Independence", isCorrect: true, rationale: "ACID gồm Atomicity, Consistency, Isolation và Durability ('I' là Isolation - Cách ly, không phải Independence - Tính độc lập)." },
           { text: "Atomicity", isCorrect: false },
           { text: "Consistency", isCorrect: false },
           { text: "Durability", isCorrect: false }
@@ -597,7 +646,7 @@
         difficulty: "medium",
         question: "The Employee table contains: Empno, Ename, Job, Sal. You execute: \nSELECT Empno, Ename, Job \"Employee Information\" FROM employee;\nHow many columns are presented in the result set?",
         options: [
-          { text: "3", isCorrect: true, rationale: "The SELECT list contains three distinct expressions: Empno, Ename, and Job (with alias \"Employee Information\"). Hence 3 columns." },
+          { text: "3", isCorrect: true, rationale: "Danh sách SELECT chứa 3 biểu thức khác nhau: Empno, Ename và Job (có alias \"Employee Information\"), vậy là 3 cột." },
           { text: "1", isCorrect: false },
           { text: "2", isCorrect: false },
           { text: "0", isCorrect: false }
@@ -636,7 +685,7 @@
         difficulty: "easy",
         question: "Evaluate this SQL statement:\nSELECT ename, sal, 12*sal+100 FROM emp;\nWhich change calculates annual compensation as monthly salary plus $100 monthly bonus, multiplied by 12?",
         options: [
-          { text: "SELECT ename, sal, 12*(sal+100) FROM emp;", isCorrect: true, rationale: "Parentheses override operator precedence so (sal+100) is evaluated first before multiplication by 12." },
+          { text: "SELECT ename, sal, 12*(sal+100) FROM emp;", isCorrect: true, rationale: "Dấu ngoặc tròn ghi đè thứ tự ưu tiên toán tử, nên (sal+100) được tính trước rồi mới nhân với 12." },
           { text: "No change is required to achieve the desired results", isCorrect: false },
           { text: "SELECT ename, sal, (12*sal) +100 FROM emp;", isCorrect: false },
           { text: "SELECT ename, sal+100,*12 FROM emp;", isCorrect: false }
@@ -675,7 +724,7 @@
         difficulty: "easy",
         question: "What will be the output of the query: SELECT 1 FROM employees;",
         options: [
-          { text: "This statement will return 1 as many times as the number of rows in the employees table.", isCorrect: true, rationale: "A constant in the SELECT list evaluates for every row fetched from the table." },
+          { text: "This statement will return 1 as many times as the number of rows in the employees table.", isCorrect: true, rationale: "Hằng số trong danh sách SELECT được tính cho mỗi dòng được lấy ra từ bảng." },
           { text: "This statement will return first row of the employees table", isCorrect: false },
           { text: "This statement will return only one row and one column in output and value will be 1.", isCorrect: false },
           { text: "This statement will return error.", isCorrect: false }
@@ -701,7 +750,7 @@
         difficulty: "easy",
         question: "What is true about NULL in SQL databases?",
         options: [
-          { text: "NULL is a value that is unavailable, unassigned, unknown, or inapplicable", isCorrect: true, rationale: "By relational definition, NULL represents an absence of value, distinct from blank spaces or zero." },
+          { text: "NULL is a value that is unavailable, unassigned, unknown, or inapplicable", isCorrect: true, rationale: "Theo định nghĩa quan hệ, NULL biểu diễn sự vắng mặt của giá trị, khác với chuỗi rỗng hay số 0." },
           { text: "NULL is same as blank spaces", isCorrect: false },
           { text: "NULL in a number column can be treated as zero", isCorrect: false },
           { text: "NULL means an incorrect value", isCorrect: false }
@@ -766,7 +815,7 @@
         difficulty: "medium",
         question: "In the query: SELECT id_number, (quantity - 100 / 0.15 + 20 - 10) FROM inventory; which expression is evaluated first?",
         options: [
-          { text: "100 / 0.15", isCorrect: true, rationale: "Multiplication and division have higher operator precedence than addition and subtraction." },
+          { text: "100 / 0.15", isCorrect: true, rationale: "Nhân và chia có độ ưu tiên cao hơn cộng và trừ." },
           { text: "quantity - 100", isCorrect: false },
           { text: "0.15 + 20", isCorrect: false },
           { text: "20 - 10", isCorrect: false }
@@ -844,7 +893,7 @@
         difficulty: "medium",
         question: "What does the TRUNCATE TABLE statement do?",
         options: [
-          { text: "Removes all rows from a table and releases the allocated storage space immediately", isCorrect: true, rationale: "TRUNCATE is a DDL command that deallocates storage blocks and cannot be rolled back." },
+          { text: "Removes all rows from a table and releases the allocated storage space immediately", isCorrect: true, rationale: "TRUNCATE là lệnh DDL giải phóng các block lưu trữ và không thể rollback (không hoàn tác được)." },
           { text: "Removes the table structure and its definitions from the data dictionary", isCorrect: false },
           { text: "Shortens the table to 10 rows", isCorrect: false },
           { text: "Removes all columns from a table but keeps the rows", isCorrect: false }
@@ -896,7 +945,7 @@
         difficulty: "medium",
         question: "Evaluate: DROP TABLE DEPT; Which statement is false about this SQL statement?",
         options: [
-          { text: "All views based on the DEPT table are deleted.", isCorrect: true, rationale: "Dependent views are NOT deleted automatically; they are simply rendered INVALID in the data dictionary." },
+          { text: "All views based on the DEPT table are deleted.", isCorrect: true, rationale: "Các view phụ thuộc KHÔNG bị xóa theo; chúng chỉ bị đánh dấu INVALID trong data dictionary." },
           { text: "You cannot roll back this statement.", isCorrect: false },
           { text: "All pending transactions are committed.", isCorrect: false },
           { text: "All indexes based on the DEPT table are dropped.", isCorrect: false }
@@ -961,7 +1010,7 @@
         difficulty: "medium",
         question: "You need to modify STUDENTS to add a primary key on STUDENT_ID. Which statement accomplishes this?",
         options: [
-          { text: "ALTER TABLE students ADD CONSTRAINT stud_id_pk PRIMARY KEY (student_id);", isCorrect: true, rationale: "This adheres strictly to the SQL DDL syntax for adding a named constraint to an existing table." },
+          { text: "ALTER TABLE students ADD CONSTRAINT stud_id_pk PRIMARY KEY (student_id);", isCorrect: true, rationale: "Câu lệnh này tuân thủ đúng cú pháp SQL DDL khi thêm một ràng buộc có tên vào bảng đã tồn tại." },
           { text: "ALTER TABLE students ADD PRIMARY KEY student_id;", isCorrect: false },
           { text: "ALTER TABLE students ADD CONSTRAINT PRIMARY KEY (student_id);", isCorrect: false },
           { text: "ALTER TABLE students ADD CONSTRAINT stud_id_pk PRIMARY KEY student_id;", isCorrect: false }
@@ -1130,7 +1179,7 @@
         difficulty: "hard",
         question: "CREATE TABLE orders (SER_NO NUMBER UNIQUE, ORDER_ID NUMBER, ORDER_DATE DATE NOT NULL, STATUS VARCHAR2(10) CHECK (status IN ('CREDIT', 'CASH')), PROD_ID NUMBER REFERENCES PRODUCTS(PRODUCT_ID), ORD_TOTAL NUMBER); For which columns is an index automatically created?",
         options: [
-          { text: "SER_NO", isCorrect: true, rationale: "Oracle automatically creates a unique B-Tree index to enforce UNIQUE and PRIMARY KEY constraints." },
+          { text: "SER_NO", isCorrect: true, rationale: "Oracle tự động tạo chỉ mục B-Tree duy nhất để thực thi các ràng buộc UNIQUE và PRIMARY KEY." },
           { text: "ORDER_ID", isCorrect: false },
           { text: "STATUS", isCorrect: false },
           { text: "PROD_ID", isCorrect: false }
@@ -1221,7 +1270,7 @@
         difficulty: "hard",
         question: "Which statement about the CASCADE CONSTRAINTS clause is not true?",
         options: [
-          { text: "The CASCADE CONSTRAINTS can be used while creating the constraint to enable automatic dropping of foreign key constraint when a primary key is dropped.", isCorrect: true, rationale: "CASCADE CONSTRAINTS is used with DROP TABLE or DROP/DISABLE CONSTRAINT commands, not as a standalone clause during basic constraint creation." },
+          { text: "The CASCADE CONSTRAINTS can be used while creating the constraint to enable automatic dropping of foreign key constraint when a primary key is dropped.", isCorrect: true, rationale: "CASCADE CONSTRAINTS dùng kèm lệnh DROP TABLE hoặc DROP/DISABLE CONSTRAINT, không phải mệnh đề riêng lẻ khi tạo ràng buộc." },
           { text: "The CASCADE CONSTRAINTS clause is used along with the DROP COLUMN clause.", isCorrect: false },
           { text: "The CASCADE CONSTRAINTS clause drops all referential integrity constraints that refer to the primary and unique keys defined on the dropped columns.", isCorrect: false },
           { text: "The CASCADE CONSTRAINTS clause also drops all multicolumn constraints defined on the dropped columns", isCorrect: false }
@@ -1416,7 +1465,7 @@
         difficulty: "medium",
         question: "Which is not true regarding the MERGE statement?",
         options: [
-          { text: "A MERGE statement replaces the complete data of one table with that of another.", isCorrect: true, rationale: "MERGE performs conditional INSERT or UPDATE based on matching join conditions; it does not replace the entire target table blindly." },
+          { text: "A MERGE statement replaces the complete data of one table with that of another.", isCorrect: true, rationale: "MERGE thực hiện INSERT hoặc UPDATE có điều kiện dựa trên các điều kiện join; nó không thay thế toàn bộ bảng đích một cách mù quáng." },
           { text: "A MERGE statement is used to merge the data of one table with data from another.", isCorrect: false },
           { text: "A MERGE statement can be used to insert new rows into a table.", isCorrect: false },
           { text: "A MERGE statement can be used to update existing rows in a table.", isCorrect: false }
@@ -1559,7 +1608,7 @@
         difficulty: "easy",
         question: "Evaluate: DELETE employee_id, salary, job_id FROM employees WHERE dept_id = 90; Why does it fail?",
         options: [
-          { text: "You cannot specify column names in the DELETE clause of the DELETE statement.", isCorrect: true, rationale: "DELETE removes whole rows; it does not accept individual column names in the DELETE clause." },
+          { text: "You cannot specify column names in the DELETE clause of the DELETE statement.", isCorrect: true, rationale: "DELETE xóa nguyên dòng; mệnh đề DELETE không nhận tên cột riêng lẻ." },
           { text: "There is no row with dept_id 90 in the EMPLOYEES table.", isCorrect: false },
           { text: "You cannot delete the JOB_ID column because it is a NOT NULL column.", isCorrect: false },
           { text: "You cannot delete the EMPLOYEE_ID column because it is the primary key of the table.", isCorrect: false }
@@ -1689,7 +1738,7 @@
         difficulty: "hard",
         question: "Evaluate: SELECT ROUND(45.953, -1), TRUNC(45.936, 2) FROM dual; Which values are displayed?",
         options: [
-          { text: "50 and 45.93", isCorrect: true, rationale: "ROUND(45.953, -1) rounds to the nearest ten (producing 50), and TRUNC(45.936, 2) truncates without rounding to 2 decimal places (45.93)." },
+          { text: "50 and 45.93", isCorrect: true, rationale: "ROUND(45.953, -1) làm tròn tới bội số gần nhất của 10 (được 50), còn TRUNC(45.936, 2) cắt bỏ phần thập phân dư (không làm tròn) nên được 45.93." },
           { text: "46 and 45", isCorrect: false },
           { text: "46 and 45.93", isCorrect: false },
           { text: "50 and 45.9", isCorrect: false }
@@ -1845,7 +1894,7 @@
         difficulty: "hard",
         question: "Which statement is incorrect about SQL functions?",
         options: [
-          { text: "NVL2 returns the first non-null expression in the expression list.", isCorrect: true, rationale: "COALESCE returns the first non-null expression in a list. NVL2(expr1, expr2, expr3) tests expr1 and returns expr2 if not null, expr3 if null." },
+          { text: "NVL2 returns the first non-null expression in the expression list.", isCorrect: true, rationale: "COALESCE trả về biểu thức khác NULL đầu tiên trong danh sách. NVL2(expr1, expr2, expr3) kiểm tra expr1: khác NULL thì trả expr2, bằng NULL thì trả expr3." },
           { text: "DECODE translates an expression after comparing it to each search value.", isCorrect: false },
           { text: "TRIM trims the heading or trailing characters (or both) from a character string.", isCorrect: false },
           { text: "NULLIF compares two expressions and returns null if they are equal, or the first expression if they are not equal", isCorrect: false }
@@ -1884,7 +1933,7 @@
         difficulty: "medium",
         question: "Which statement is true about WHERE and HAVING clauses?",
         options: [
-          { text: "A HAVING clause can be used to restrict both rows and groups.", isCorrect: true, rationale: "HAVING can filter on aggregate functions as well as regular row columns, whereas WHERE cannot filter aggregates." },
+          { text: "A HAVING clause can be used to restrict both rows and groups.", isCorrect: true, rationale: "HAVING có thể lọc theo hàm tổng hợp lẫn cột dòng thông thường, trong khi WHERE không lọc được hàm tổng hợp." },
           { text: "A HAVING clause can be used to restrict groups only.", isCorrect: false },
           { text: "A WHERE clause can be used to restrict groups only.", isCorrect: false },
           { text: "A WHERE clause can be used to restrict both rows and groups.", isCorrect: false }
@@ -2040,7 +2089,7 @@
         difficulty: "hard",
         question: "What is true about: SELECT MAX(AVG(salary)) FROM employees GROUP BY department_id;",
         options: [
-          { text: "It will display the maximum of the average salaries for each department", isCorrect: true, rationale: "Oracle allows nesting of group functions to two levels. The GROUP BY is required and returns a single scalar value." },
+          { text: "It will display the maximum of the average salaries for each department", isCorrect: true, rationale: "Oracle cho phép lồng hàm tổng hợp tối đa 2 cấp. Câu lệnh này có GROUP BY và trả về một giá trị vô hướng duy nhất." },
           { text: "It will return an error as Group functions can not be nested", isCorrect: false },
           { text: "It will return Maximum average salary for each department", isCorrect: false },
           { text: "It will return error because Salary is not included in the group by clause", isCorrect: false }
@@ -2144,7 +2193,7 @@
         difficulty: "medium",
         question: "In which case would you use a FULL OUTER JOIN?",
         options: [
-          { text: "You want all unmatched data from both tables.", isCorrect: true, rationale: "A FULL OUTER JOIN retrieves matched rows plus non-matching rows from both left and right tables." },
+          { text: "You want all unmatched data from both tables.", isCorrect: true, rationale: "FULL OUTER JOIN lấy các dòng khớp nhau cộng với các dòng không khớp ở cả bảng trái và bảng phải." },
           { text: "You want all unmatched data from one table.", isCorrect: false },
           { text: "Both tables have NULL values.", isCorrect: false },
           { text: "You want all matched data from both tables.", isCorrect: false }
@@ -2313,7 +2362,7 @@
         difficulty: "medium",
         question: "What is true about joining tables through an equijoin?",
         options: [
-          { text: "You can join n tables in a SQL statement by specifying a minimum of n-1 join conditions.", isCorrect: true, rationale: "To avoid Cartesian product in an n-table join, exactly n-1 join conditions are required." },
+          { text: "You can join n tables in a SQL statement by specifying a minimum of n-1 join conditions.", isCorrect: true, rationale: "Để tránh Cartesian product khi join n bảng, cần đúng n-1 điều kiện join." },
           { text: "You specify an equijoin condition in the SELECT or FROM clauses of a SELECT statement.", isCorrect: false },
           { text: "You can join a maximum of two columns through an equijoin.", isCorrect: false },
           { text: "You can join a maximum of two tables through an equijoin.", isCorrect: false }
@@ -2404,7 +2453,7 @@
         difficulty: "hard",
         question: "SELECT employee_id, name FROM employee WHERE employee_id NOT IN (SELECT employee_id FROM employee WHERE department_id = 30 AND job = 'CLERK'); What happens if the inner query returns a NULL value?",
         options: [
-          { text: "No rows would be selected from the EMPLOYEE table.", isCorrect: true, rationale: "With NOT IN, if any value returned by the subquery is NULL, the logical evaluation yields UNKNOWN/FALSE for all rows." },
+          { text: "No rows would be selected from the EMPLOYEE table.", isCorrect: true, rationale: "Với NOT IN, nếu bất kỳ giá trị nào do câu con trả về là NULL thì phép tính cho kết quả UNKNOWN/FALSE cho mọi dòng." },
           { text: "A syntax error would be returned.", isCorrect: false },
           { text: "Only the rows with EMPLOYEE_ID values equal to NULL would be included in the results.", isCorrect: false },
           { text: "All the EMPLOYEE_ID and NAME values in the EMPLOYEE table would be displayed.", isCorrect: false }
@@ -2690,7 +2739,7 @@
         difficulty: "hard",
         question: "Which statement is not true about Correlated Subqueries?",
         options: [
-          { text: "A correlated sub query is evaluated once for each parent statement.", isCorrect: true, rationale: "A correlated subquery is evaluated once for *each candidate row* processed by the parent statement, not once per statement." },
+          { text: "A correlated sub query is evaluated once for each parent statement.", isCorrect: true, rationale: "Câu con tương quan (correlated subquery) được tính một lần cho MỖI dòng ứng viên mà câu lệnh cha xử lý, không phải một lần cho cả câu lệnh." },
           { text: "A correlated sub query is evaluated once for each row processed by the parent statement.", isCorrect: false },
           { text: "The parent statement can be a SELECT, UPDATE, or DELETE statement.", isCorrect: false },
           { text: "The Oracle Server performs a correlated sub query when the sub query references a column from a table referred to in the parent statement.", isCorrect: false }
@@ -2716,7 +2765,7 @@
         difficulty: "medium",
         question: "What does the EXISTS operator return when the inner query selects no records?",
         options: [
-          { text: "FALSE", isCorrect: true, rationale: "EXISTS checks for row existence; if 0 rows are returned, it evaluates to FALSE." },
+          { text: "FALSE", isCorrect: true, rationale: "EXISTS kiểm tra sự tồn tại của dòng; nếu trả về 0 dòng thì kết quả là FALSE." },
           { text: "0", isCorrect: false },
           { text: "TRUE", isCorrect: false },
           { text: "NULL", isCorrect: false }
@@ -2989,7 +3038,7 @@
         difficulty: "easy",
         question: "What does the FORCE option do when creating a view in Oracle?",
         options: [
-          { text: "creates a view regardless of whether or not the base tables exist", isCorrect: true, rationale: "CREATE FORCE VIEW creates the view object even if underlying tables are missing or privileges are not yet granted." },
+          { text: "creates a view regardless of whether or not the base tables exist", isCorrect: true, rationale: "CREATE FORCE VIEW tạo đối tượng view ngay cả khi bảng nền chưa tồn tại hoặc quyền chưa được cấp." },
           { text: "creates a view in another schema even if you don't have privileges", isCorrect: false },
           { text: "creates a view even if the underlying parent table has constraints", isCorrect: false },
           { text: "creates a view with constraints", isCorrect: false }
@@ -3249,7 +3298,7 @@
         difficulty: "easy",
         question: "What data does the DUAL table contain by default?",
         options: [
-          { text: "One column named DUMMY and one row with value 'X'", isCorrect: true, rationale: "DUAL is owned by SYS and contains exactly one VARCHAR2(1) column DUMMY with row 'X'." },
+          { text: "One column named DUMMY and one row with value 'X'", isCorrect: true, rationale: "DUAL thuộc sở hữu của SYS và có đúng một cột VARCHAR2(1) tên DUMMY với một dòng giá trị 'X'." },
           { text: "One column named D and one row with value X", isCorrect: false },
           { text: "One column named COL and one row with value 1", isCorrect: false },
           { text: "DUAL table doesn't contain any data by default.", isCorrect: false }
@@ -3379,7 +3428,7 @@
         difficulty: "medium",
         question: "Which of the set operators when used, the output of the query is not sorted by default?",
         options: [
-          { text: "Union All", isCorrect: true, rationale: "UNION, INTERSECT, and MINUS implicitly sort to eliminate duplicates; UNION ALL does not sort." },
+          { text: "Union All", isCorrect: true, rationale: "UNION, INTERSECT và MINUS ngầm sắp xếp để loại bỏ dòng trùng; UNION ALL thì không sắp xếp." },
           { text: "Union", isCorrect: false },
           { text: "Intersect", isCorrect: false },
           { text: "Minus", isCorrect: false }
@@ -3509,7 +3558,7 @@
         difficulty: "hard",
         question: "Which of the following conditions is not a valid condition for a table to be in First Normal Form (1NF)?",
         options: [
-          { text: "There's left-to-right ordering to the columns.", isCorrect: true, rationale: "In relational theory (and 1NF), column order is irrelevant and does not impose semantic meaning." },
+          { text: "There's left-to-right ordering to the columns.", isCorrect: true, rationale: "Theo lý thuyết quan hệ (và 1NF), thứ tự cột không có ý nghĩa và không mang giá trị ngữ nghĩa." },
           { text: "There are no duplicate rows.", isCorrect: false },
           { text: "There's no top-to-bottom ordering to the rows.", isCorrect: false },
           { text: "Every row-and-column intersection contains exactly one value from the applicable domain", isCorrect: false }
@@ -3522,7 +3571,7 @@
         difficulty: "hard",
         question: "Why is a 1NF table containing composite primary key (Employee, Skill) and non-key attribute Current_Work_Location (which depends only on Employee) not in 2NF?",
         options: [
-          { text: "The non-prime attribute(s) are not dependent on each of the prime attributes (Partial functional dependency exists).", isCorrect: true, rationale: "2NF requires that all non-prime attributes are fully functionally dependent on the entire primary key, eliminating partial dependencies." },
+          { text: "The non-prime attribute(s) are not dependent on each of the prime attributes (Partial functional dependency exists).", isCorrect: true, rationale: "2NF yêu cầu mọi thuộc tính phi lõi phải phụ thuộc hàm TOÀN BỘ vào khóa chính, loại bỏ phụ thuộc hàm một phần." },
           { text: "The table contains multiple records for Same Employee name, so not in 2NF", isCorrect: false },
           { text: "The non-prime attribute(s) are dependent on each of the prime attributes.", isCorrect: false },
           { text: "The table is not in 1NF hence not in 2NF", isCorrect: false }
@@ -3613,7 +3662,7 @@
         difficulty: "medium",
         question: "What is the correct full form of the BCNF normal form?",
         options: [
-          { text: "Boyce-Codd normal form", isCorrect: true, rationale: "BCNF is named after Raymond F. Boyce and Edgar F. Codd." },
+          { text: "Boyce-Codd normal form", isCorrect: true, rationale: "BCNF được đặt theo tên Raymond F. Boyce và Edgar F. Codd." },
           { text: "Boyce-Cartesian normal form", isCorrect: false },
           { text: "Bond-Codd normal form", isCorrect: false },
           { text: "Borne-Codd normal form", isCorrect: false }
@@ -3705,14 +3754,19 @@
     let currentQuestions = [];
     let currentIndex = 0;
     let userAnswers = {}; // { questionId: selectedIndex }
+    let everWrongIds = new Set(); // question ids answered wrong at least once in this session
     let isExamMode = false;
     let examTimerInterval = null;
     let remainingSeconds = 3600; // 60 mins
     let selectedQuestionCount = 20;
 
     // Flashcard State
-    let flashcardIndex = 0;
     let isCardFlipped = false;
+    let flashcardQueue = [];        // ids of the current session
+    let flashcardPos = 0;           // position inside flashcardQueue
+    let fcRequeuedIds = new Set();  // ids already re-queued once in this session
+    let fcDoneCount = 0;            // cards marked "Đã thuộc" in this session
+    let fcTodoCount = 0;            // cards marked "Chưa thuộc" in this session
 
     // Local Storage Keys
     const LS_MISTAKES = "cdac_db_mistakes_ids";
@@ -3754,6 +3808,12 @@
       updateDashboardStats();
     }
 
+    function removeMasteredId(id) {
+      let list = getMasteredIds().filter(itemId => itemId !== id);
+      localStorage.setItem(LS_MASTERED, JSON.stringify(list));
+      updateDashboardStats();
+    }
+
     function updateDashboardStats() {
       const mistakes = getMistakeIds();
       const mastered = getMasteredIds();
@@ -3779,6 +3839,17 @@
         }
         countLabel.textContent = mistakes.length;
         masteredLabel.textContent = mastered.length;
+      }
+
+      const btnReviewCards = document.getElementById("btn-review-cards");
+      const btnFcReview = document.getElementById("btn-fc-review");
+      if (btnReviewCards) {
+        if (mistakes.length > 0) btnReviewCards.removeAttribute("disabled");
+        else btnReviewCards.setAttribute("disabled", "true");
+      }
+      if (btnFcReview) {
+        if (mistakes.length > 0) btnFcReview.removeAttribute("disabled");
+        else btnFcReview.setAttribute("disabled", "true");
       }
     }
 
@@ -3880,6 +3951,7 @@
       currentQuestions = prepareQuestions(pool, selectedQuestionCount, diffValue);
       currentIndex = 0;
       userAnswers = {};
+      everWrongIds = new Set();
       isExamMode = false;
 
       setupQuizHeader("Luyện tập tuỳ chỉnh", `Bộ câu hỏi ${currentQuestions.length} câu`);
@@ -3899,6 +3971,7 @@
       currentQuestions = prepareQuestions(pool, pool.length, 'random');
       currentIndex = 0;
       userAnswers = {};
+      everWrongIds = new Set();
       isExamMode = false;
 
       setupQuizHeader("Ôn tập câu làm sai", `${currentQuestions.length} câu cần củng cố`);
@@ -3915,15 +3988,15 @@
       currentQuestions = prepareQuestions(RAW_QUESTIONS, 40, 'progressive');
       currentIndex = 0;
       userAnswers = {};
+      everWrongIds = new Set();
       isExamMode = true;
       remainingSeconds = 60 * 60;
 
-      setupQuizHeader("Kỳ thi Quốc tế CDAC", "Standard CDAC Exam");
-      document.getElementById("quiz-timer-container").classList.remove("hidden");
-      startTimer();
+      setupQuizHeader("Kỳ thi Quốc tế CDAC", "Thi thử CDAC chuẩn quốc tế");
 
       showView('quiz');
       renderQuestion();
+      startTimer(); // must run AFTER showView (showView clears the previous interval)
     }
 
     function setupQuizHeader(title, subtitle) {
@@ -3931,6 +4004,11 @@
       document.getElementById("quiz-module-badge").textContent = subtitle;
       document.getElementById("q-total").textContent = currentQuestions.length;
       document.getElementById("btn-check-q").classList.toggle("hidden", isExamMode);
+      document.getElementById("btn-hint-q").classList.toggle("hidden", isExamMode);
+
+      const timerBox = document.getElementById("quiz-timer-container");
+      timerBox.classList.toggle("hidden", !isExamMode);
+      if (isExamMode) updateTimerDisplay();
     }
 
     function startTimer() {
@@ -3980,6 +4058,11 @@
       // Hide feedback container initially
       const feedbackContainer = document.getElementById("feedback-container");
       feedbackContainer.classList.add("hidden");
+      const hintBox = document.getElementById("hint-box");
+      if (hintBox) {
+        hintBox.classList.add("hidden");
+        hintBox.innerHTML = "";
+      }
 
       // Render options
       const optContainer = document.getElementById("options-container");
@@ -4043,6 +4126,14 @@
     function selectOption(index) {
       const q = currentQuestions[currentIndex];
       userAnswers[q.id] = index;
+
+      // Record the mistake on the FIRST wrong pick so it is never lost
+      // when the user later switches to the correct answer.
+      if (!q.options[index].isCorrect) {
+        everWrongIds.add(q.id);
+        saveMistakeId(q.id);
+      }
+
       renderQuestion();
     }
 
@@ -4056,6 +4147,37 @@
       revealFeedback(q, selected);
     }
 
+    function showHint() {
+      if (isExamMode) return;
+      const q = currentQuestions[currentIndex];
+      const correctOpt = q.options.find(o => o.isCorrect);
+      const box = document.getElementById("hint-box");
+      if (!box || !correctOpt) return;
+
+      const diffLabel = q.difficulty === 'hard' ? 'Nâng cao' : (q.difficulty === 'medium' ? 'Trung bình' : 'Cơ bản');
+      const firstLetter = correctOpt.text.trim().charAt(0).toUpperCase();
+
+      box.innerHTML = "";
+      const title = document.createElement("div");
+      title.className = "font-bold flex items-center gap-2";
+      title.innerHTML = '<i class="fa-solid fa-lightbulb text-amber-500"></i> Gợi ý';
+      box.appendChild(title);
+
+      const lines = [
+        `Chuyên đề: ${q.moduleName} · Độ khó: ${diffLabel}`,
+        `Đáp án đúng bắt đầu bằng chữ cái: "${firstLetter}"`,
+        `Mẹo: đọc kỹ cú pháp/quy tắc SQL trong đề bài, loại trừ từng phương án mâu thuẫn với kiến thức nền.`
+      ];
+      lines.forEach(text => {
+        const p = document.createElement("div");
+        p.textContent = text;
+        box.appendChild(p);
+      });
+
+      box.classList.remove("hidden");
+      box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
     function revealFeedback(q, selectedIdx) {
       const isCorrect = q.options[selectedIdx].isCorrect;
       const feedback = document.getElementById("feedback-container");
@@ -4065,17 +4187,26 @@
       feedback.classList.remove("hidden");
       if (isCorrect) {
         feedback.className = "p-4 rounded-xl text-sm border space-y-1 bg-emerald-50 border-emerald-300 text-emerald-900";
-        status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> Chính xác! (100% Mark)`;
-        removeMistakeId(q.id);
-        saveMasteredId(q.id);
+        status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-600"></i> Chính xác! (+1 điểm)`;
+        // A question that was answered wrong at least once in this session
+        // stays in the "câu sai" list for review.
+        if (!everWrongIds.has(q.id)) {
+          removeMistakeId(q.id);
+          saveMasteredId(q.id);
+        }
       } else {
         feedback.className = "p-4 rounded-xl text-sm border space-y-1 bg-red-50 border-red-300 text-red-900";
-        status.innerHTML = `<i class="fa-solid fa-circle-xmark text-red-600"></i> Chưa chính xác (-33.3% Penalty)`;
+        status.innerHTML = `<i class="fa-solid fa-circle-xmark text-red-600"></i> Chưa chính xác (trừ 33.3% điểm)`;
+        everWrongIds.add(q.id);
         saveMistakeId(q.id);
       }
 
       const correctOpt = q.options.find(o => o.isCorrect);
-      rationale.innerHTML = `<strong>Giải thích giảng viên:</strong> ${correctOpt.rationale || "Đáp án đúng theo chuẩn Oracle SQL & CDAC syllabus."}`;
+      rationale.innerHTML = "";
+      const strong = document.createElement("strong");
+      strong.textContent = "Giải thích:";
+      rationale.appendChild(strong);
+      rationale.appendChild(document.createTextNode(" " + (correctOpt.rationale || "Đáp án đúng theo chuẩn Oracle SQL & CDAC syllabus.")));
     }
 
     function goToNextQuestion() {
@@ -4116,10 +4247,15 @@
           unansweredCount++;
         } else if (q.options[ans].isCorrect) {
           correctCount++;
-          removeMistakeId(q.id);
-          saveMasteredId(q.id);
+          // Keep the question in the review list if it was ever answered
+          // wrong during this session (the mistake was recorded on first wrong pick).
+          if (!everWrongIds.has(q.id)) {
+            removeMistakeId(q.id);
+            saveMasteredId(q.id);
+          }
         } else {
           wrongCount++;
+          everWrongIds.add(q.id);
           saveMistakeId(q.id);
         }
       });
@@ -4156,19 +4292,82 @@
     /* =========================================================================
        7. FLASHCARD ENGINE
        ========================================================================= */
-    function startFlashcards() {
-      flashcardIndex = 0;
+    function startFlashcards(reviewOnly) {
+      let ids;
+      if (reviewOnly) {
+        const mistakeIds = getMistakeIds();
+        if (mistakeIds.length === 0) {
+          alert("Hiện không có thẻ nào trong danh sách chưa thuộc!");
+          return;
+        }
+        ids = mistakeIds;
+      } else {
+        ids = RAW_QUESTIONS.map(q => q.id);
+      }
+
+      flashcardQueue = ids.slice();
+      flashcardPos = 0;
+      fcRequeuedIds = new Set();
+      fcDoneCount = 0;
+      fcTodoCount = 0;
       isCardFlipped = false;
+
       showView('flashcards');
       renderFlashcard();
     }
 
+    function getFlashcardQuestion() {
+      const id = flashcardQueue[flashcardPos];
+      if (id === undefined) return null;
+      return RAW_QUESTIONS.find(q => q.id === id) || null;
+    }
+
+    function updateFlashcardStats() {
+      const left = Math.max(0, flashcardQueue.length - flashcardPos);
+      const setText = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+      setText("fc-done-count", fcDoneCount);
+      setText("fc-todo-count", fcTodoCount);
+      setText("fc-left-count", left);
+      setText("fc-done-total", fcDoneCount);
+      setText("fc-todo-total", fcTodoCount);
+    }
+
+    function showFlashcardFinished() {
+      updateFlashcardStats();
+      document.getElementById("fc-card").classList.add("hidden");
+      document.getElementById("fc-nav").classList.add("hidden");
+      document.getElementById("fc-done").classList.remove("hidden");
+      const cur = document.getElementById("fc-current");
+      const total = document.getElementById("fc-total");
+      if (cur) cur.textContent = 0;
+      if (total) total.textContent = flashcardQueue.length;
+    }
+
     function renderFlashcard() {
-      const q = RAW_QUESTIONS[flashcardIndex];
+      updateFlashcardStats();
+
+      if (flashcardPos >= flashcardQueue.length) {
+        showFlashcardFinished();
+        return;
+      }
+
+      document.getElementById("fc-done").classList.add("hidden");
+      document.getElementById("fc-card").classList.remove("hidden");
+      document.getElementById("fc-nav").classList.remove("hidden");
+
+      const q = getFlashcardQuestion();
+      if (!q) {
+        flashcardPos++;
+        renderFlashcard();
+        return;
+      }
       const correctOpt = q.options.find(o => o.isCorrect);
 
-      document.getElementById("fc-current").textContent = flashcardIndex + 1;
-      document.getElementById("fc-total").textContent = RAW_QUESTIONS.length;
+      document.getElementById("fc-current").textContent = flashcardPos + 1;
+      document.getElementById("fc-total").textContent = flashcardQueue.length;
       document.getElementById("fc-module").textContent = `Module ${q.module}: ${q.moduleName}`;
       document.getElementById("fc-question").textContent = q.question;
       document.getElementById("fc-answer").textContent = correctOpt.text;
@@ -4180,25 +4379,47 @@
     }
 
     function flipCard() {
+      if (flashcardPos >= flashcardQueue.length) return;
       isCardFlipped = !isCardFlipped;
       document.getElementById("flashcard-inner").classList.toggle("rotate-y-180", isCardFlipped);
     }
 
     function nextFlashcard() {
-      flashcardIndex = (flashcardIndex + 1) % RAW_QUESTIONS.length;
+      flashcardPos = Math.min(flashcardPos + 1, flashcardQueue.length);
       renderFlashcard();
     }
 
     function prevFlashcard() {
-      flashcardIndex = (flashcardIndex - 1 + RAW_QUESTIONS.length) % RAW_QUESTIONS.length;
+      flashcardPos = Math.max(0, flashcardPos - 1);
       renderFlashcard();
     }
 
     function markCardMastered() {
-      const q = RAW_QUESTIONS[flashcardIndex];
+      const q = getFlashcardQuestion();
+      if (!q) return;
       removeMistakeId(q.id);
       saveMasteredId(q.id);
-      nextFlashcard();
+      fcDoneCount++;
+      // Drop the card from the queue: the next one slides into its place.
+      flashcardQueue.splice(flashcardPos, 1);
+      renderFlashcard();
+    }
+
+    function markCardUnmastered() {
+      const q = getFlashcardQuestion();
+      if (!q) return;
+      saveMistakeId(q.id);
+      removeMasteredId(q.id);
+      fcTodoCount++;
+      // Send it to the "chưa thuộc" list and review it again at the end
+      // of this session (max one re-queue per card so the session terminates).
+      const alreadyWaiting = flashcardQueue.slice(flashcardPos + 1).includes(q.id);
+      if (!fcRequeuedIds.has(q.id) && !alreadyWaiting) {
+        fcRequeuedIds.add(q.id);
+        flashcardQueue.push(q.id);
+      }
+      flashcardPos++;
+      renderFlashcard();
     }
 
     /* =========================================================================
